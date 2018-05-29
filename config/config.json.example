@@ -1,0 +1,8 @@
+{
+      "okHost":"https://api.ok.ru/fb.do",
+      "okFormat":"json",
+      "okApplicationKey": "",
+      "okGid": "",
+      "okAccessToken": "",
+      "okSessionSecretKey": ""
+}

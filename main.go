@@ -13,18 +13,11 @@ import (
 	"sort"
 	"strings"
 	"time"
-
 	"./models"
 
 	"github.com/patrickmn/go-cache"
+	"github.com/spf13/viper"
 )
-
-const okHost string = "https://api.ok.ru/fb.do"
-const okApplicationKey string = ""
-const okFormat string = "json"
-const okGid string = ""
-const okAccessToken string = ""
-const okSessionSecretKey string = ""
 
 
 var topics map[int]*models.Topic
@@ -55,7 +48,8 @@ func GetMd5Hash(p map[string]string, keys []string) string {
 		buffer.WriteString("=")
 		buffer.WriteString(p[v])
 	}
-	buffer.WriteString(okSessionSecretKey)
+
+	buffer.WriteString(viper.GetString("okSessionSecretKey"))
 
 	h := md5.New()
 	io.WriteString(h, buffer.String())
@@ -66,7 +60,7 @@ func GetMd5Hash(p map[string]string, keys []string) string {
 //Формирум Query
 func makeRequest(p map[string]string, keys []string, sig string) *http.Request {
 
-	req, _ := http.NewRequest("GET", okHost, nil)
+	req, _ := http.NewRequest("GET", viper.GetString("okHost"), nil)
 	values := req.URL.Query()
 
 	for _, v := range keys {
@@ -74,7 +68,7 @@ func makeRequest(p map[string]string, keys []string, sig string) *http.Request {
 	}
 
 	values.Add("sig", sig)
-	values.Add("access_token", okAccessToken)
+	values.Add("access_token", viper.GetString("okAccessToken"))
 
 	req.URL.RawQuery = values.Encode()
 	return req
@@ -83,9 +77,9 @@ func makeRequest(p map[string]string, keys []string, sig string) *http.Request {
 func sendRequest(p map[string]string) interface{} {
 
 	params := map[string]string{
-		"application_key": okApplicationKey,
-		"format":          okFormat,
-		"gid":             okGid,
+		"application_key": viper.GetString("okApplicationKey"),
+		"format":          viper.GetString("okFormat"),
+		"gid":             viper.GetString("okGid"),
 	}
 
 	for k, v := range params {
@@ -111,27 +105,25 @@ func getTopics() {
 	params := map[string]string{
 		"method": "group.getStatTopics",
 		"fields": "ID,COMMENTS",
-		"count" : "24",
+		"count":  "24",
 	}
 
 	m := sendRequest(params).(map[string]interface{})
-	t :=  m["topics"].([]interface{})
-
+	t := m["topics"].([]interface{})
 
 	//s := []int{5, 4, 3, 2, 1}
 	//for i := len(s)-1; i >= 0; i-- {
 	//	fmt.Println(s[i])
 	//}
 
-	for   i :=len(t)-1; i>=0; i-- {
+	for i := len(t) - 1; i >= 0; i-- {
 
 		comments = make(map[string]*models.Comment, 0)
 		params := map[string]string{
-			"discussionId":    t[i].(map[string]interface{})["id"].(string),
-			"discussionType":  "GROUP_TOPIC",
-			"method":          "discussions.get",
+			"discussionId":   t[i].(map[string]interface{})["id"].(string),
+			"discussionType": "GROUP_TOPIC",
+			"method":         "discussions.get",
 		}
-
 
 		m2 := sendRequest(params).(map[string]interface{})
 
@@ -151,12 +143,11 @@ func getTopics() {
 			image := images[0].(map[string]interface{})["pic640x480"].(string)
 
 			params := map[string]string{
-				"discussionId":    id,
-				"discussionType":  "GROUP_TOPIC",
-				"method":          "discussions.getComments",
-				"direction":       "BACKWARD",
+				"discussionId":   id,
+				"discussionType": "GROUP_TOPIC",
+				"method":         "discussions.getComments",
+				"direction":      "BACKWARD",
 			}
-
 
 			m3 := sendRequest(params).(map[string]interface{})
 
@@ -185,7 +176,7 @@ func getTopics() {
 
 }
 
-func indexHandler(w http.ResponseWriter,  _ *http.Request) {
+func indexHandler(w http.ResponseWriter, _ *http.Request) {
 	t, err := template.ParseFiles("templates/index.html")
 	if err != nil {
 		fmt.Fprintln(w, err.Error())
@@ -197,6 +188,15 @@ func indexHandler(w http.ResponseWriter,  _ *http.Request) {
 }
 
 func main() {
+
+	viper.SetConfigName("config")
+	viper.AddConfigPath("./config")
+
+	err := viper.ReadInConfig()
+
+	if err != nil { // Handle errors reading the config file
+		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+	}
 
 	topics = make(map[int]*models.Topic, 0)
 
