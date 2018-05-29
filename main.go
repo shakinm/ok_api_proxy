@@ -12,16 +12,17 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 	"./models"
 
-	"github.com/patrickmn/go-cache"
 	"github.com/spf13/viper"
+	"github.com/patrickmn/go-cache"
+	"time"
 )
 
 
 var topics map[int]*models.Topic
 var comments map[string]*models.Comment
+var app_ache  = cache.New(15*time.Minute, 30*time.Minute)
 
 //Сортировка
 func SortKeys(p map[string]string) []string {
@@ -177,11 +178,22 @@ func getTopics() {
 }
 
 func indexHandler(w http.ResponseWriter, _ *http.Request) {
+
+
+
+	_, found := app_ache.Get("arrTopics")
+
+	if !found {
+		fmt.Println("Request to API OK")
+		getTopics()
+		app_ache.Set("arrTopics", topics, cache.DefaultExpiration)
+	}
+
 	t, err := template.ParseFiles("templates/index.html")
 	if err != nil {
 		fmt.Fprintln(w, err.Error())
 	}
-	fmt.Println(topics)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	t.ExecuteTemplate(w, "index", topics)
@@ -199,18 +211,7 @@ func main() {
 	}
 
 	topics = make(map[int]*models.Topic, 0)
-
-	c := cache.New(60*time.Minute, 120*time.Minute)
-
-	_, found := c.Get("arrTopics")
-
-	if !found {
-		fmt.Println("Request to API OK")
-		getTopics()
-		c.Set("arrTopics", topics, cache.DefaultExpiration)
-	}
-
-	fmt.Println(topics)
+ //fmt.Println(topics)
 
 	http.HandleFunc("/", indexHandler)
 
